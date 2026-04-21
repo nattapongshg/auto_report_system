@@ -1,0 +1,62 @@
+[PERCENT] Platinum Tier Used (88230x, paid=88230, free=0)
+          kwh=31.37 disc=50.19 inv=200.77 pay=200.77 rate=1.6
+[PERCENT] Silver Tier Used (16123x, paid=16123, free=0)
+          kwh=22.4 disc=8.96 inv=170.24 pay=170.24 rate=0.4
+[PERCENT] Gold Tier Used (9897x, paid=9897, free=0)
+          kwh=34.43 disc=27.54 inv=247.9 pay=247.9 rate=0.8
+[PERCENT] LINE MAN Driver - สิทธิ์ชาร์จไฟฟ้าราคาพิเศษ Used (8042x, paid=8042, free=0)
+          kwh=37.281 disc=59.65 inv=238.6 pay=238.6 rate=1.6
+[PERCENT] Grab Driver - สิทธิ์ชาร์จไฟฟ้าราคาพิเศษ Used (5247x, paid=5247, free=0)
+          kwh=45.094 disc=79.37 inv=281.38 pay=281.38 rate=1.76
+[MIXED  ] FGF Credit 30K Used (2633x, paid=24, free=2609)
+          kwh=22.36 disc=168.14 inv=20.0 pay=20.0 rate=7.52
+[MIXED  ] Unlimited DC Charging Used (1430x, paid=4, free=1426)
+          kwh=31.792 disc=254.34 inv=0.0 pay=0.0 rate=8.0
+[MIXED  ] THE ZEEKR PRIVILEGE PROGRAM Used (704x, paid=6, free=698)
+          kwh=28.361 disc=265.25 inv=0.0 pay=0.0 rate=9.35
+[MIXED  ] Shell Credit Balance Used (562x, paid=8, free=554)
+          kwh=50.43 disc=468.87 inv=0.0 pay=0.0 rate=9.3
+[MIXED  ] Special credit 50K Used (471x, paid=2, free=469)
+          kwh=22.56 disc=180.48 inv=0.0 pay=0.0 rate=8.0
+[CREDIT ] Shell x Hyundai Used (179x, paid=0, free=179)
+          kwh=13.153 disc=123.38 inv=0.0 pay=0.0 rate=9.38
+[MIXED  ] Special credit THB 5k (PORSCHE) Used (94x, paid=10, free=84)
+          kwh=26.096 disc=208.77 inv=0.0 pay=0.0 rate=8.0
+[MIXED  ] Privilege 20K Used (70x, paid=1, free=69)
+          kwh=37.896 disc=303.17 inv=0.0 pay=0.0 rate=8.0
+[PERCENT] Shell Platinum Used (55x, paid=55, free=0)
+          kwh=23.99 disc=112.96 inv=107.95 pay=107.95 rate=4.71
+[CREDIT ] Siri Campus Free Charging (BUS) Used (46x, paid=0, free=46)
+          kwh=85.9 disc=473.25 inv=0.0 pay=0.0 rate=5.51
+[CREDIT ] HTAS credit balance  Used (27x, paid=0, free=27)
+          kwh=38.686 disc=309.49 inv=0.0 pay=0.0 rate=8.0
+[CREDIT ] ABB CREDIT MEX25 Used (12x, paid=0, free=12)
+          kwh=73.73 disc=589.84 inv=0.0 pay=0.0 rate=8.0
+[PERCENT] PORSCHE Privilege Program Used (11x, paid=11, free=0)
+          kwh=6.013 disc=5.66 inv=50.92 pay=50.92 rate=0.94
+[MIXED  ] SHARGE VALENTINE 26 Used (10x, paid=2, free=8)
+          kwh=42.469 disc=339.75 inv=0.0 pay=0.0 rate=8.0
+[CREDIT ] SHARGE Wallet Used (6x, paid=0, free=6)
+          kwh=19.362 disc=178.33 inv=0.0 pay=0.0 rate=9.21
+[PERCENT] PrivilegeShellGO+ Used (6x, paid=6, free=0)
+          kwh=17.45 disc=50.0 inv=117.05 pay=117.05 rate=2.87
+[PERCENT] Unlock Gold Charging Rate Used (5x, paid=5, free=0)
+          kwh=20.2 disc=16.16 inv=145.44 pay=145.44 rate=0.8
+[PERCENT] Scandinavian Auto Used (4x, paid=4, free=0)
+          kwh=20.927 disc=33.48 inv=133.94 pay=133.94 rate=1.6
+[CREDIT ] Mercedes Manufacturing group Used (3x, paid=0, free=3)
+          kwh=98.923 disc=791.38 inv=0.0 pay=0.0 rate=8.0
+[PERCENT] KrungSri Wallet Used (2x, paid=2, free=0)
+          kwh=26.95 disc=50.0 inv=165.6 pay=165.6 rate=1.86
+[CREDIT ] Thai prestige - Privilege Used (2x, paid=0, free=2)
+          kwh=70.6 disc=564.8 inv=0.0 pay=0.0 rate=8.0
+[MIXED  ] Bangchak charging credit Used (2x, paid=1, free=1)
+          kwh=15.7 disc=100.0 inv=25.6 pay=25.6 rate=6.37
+[MIXED  ] Porsche Wallet Used (2x, paid=1, free=1)
+          kwh=8.787 disc=54.56 inv=20.0 pay=20.0 rate=6.21
+[CREDIT ] Charging credit THB500 Used (2x, paid=0, free=2)
+          kwh=4.985 disc=39.88 inv=0.0 pay=0.0 rate=8.0
+[CREDIT ] Denza Dynasty Chiangmai Privilege Used (2x, paid=0, free=2)
+          kwh=42.496 disc=339.97 inv=0.0 pay=0.0 rate=8.0
+[CREDIT ] Denza CAC Chonburi Privilege Used (1x, paid=0, free=1)
+          kwh=20.579 disc=164.63 inv=0.0 pay=0.0 rate=8.0

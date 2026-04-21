@@ -1,0 +1,58 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+config/metabase-dev.env.ps1
+config/*.env.ps1
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Generated data (large + regeneratable)
+backend/data/*.json
+backend/output/*.xlsx
+backend/uploads/*
+
+# Keep structure
+!backend/data/.gitkeep
+!backend/output/.gitkeep
+!backend/uploads/.gitkeep
+
+# Claude Code runtime
+.claude/scheduled_tasks.lock
+.claude/**/*.lock
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Reference files (not code)
+*.xlsx
+*.csv
+!backend/**/*.sql
+!report-templates/**/*.xlsx
+
+# Local sub-repos (Sharge codebases pulled down for reference)
+sharge-admin/
+sharge-backend/
+sharge-cms/
+sharge-fleet/
+sharge-mobile/
+sharge-socket-server/
+
+# Temp
+*.log
+*.tmp

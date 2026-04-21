@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sharge Report Studio</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div>
+          <div class="brand-wordmark">Report Studio</div>
+          <div class="brand-meta">Minimal report template builder</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button type="button" class="nav-item nav-item-active">Create Template</button>
+      </nav>
+
+      <div class="sidebar-panel">
+        <div class="sidebar-label">Source</div>
+        <div class="sidebar-value">Metabase Question URL</div>
+        <div class="sidebar-help">Create one template from one question, then attach email delivery details.</div>
+      </div>
+
+      <div class="sidebar-panel">
+        <div class="sidebar-label">Environment</div>
+        <div class="env-row">
+          <span class="status-dot"></span>
+          <span>DEV</span>
+        </div>
+        <div class="sidebar-help">Standalone workspace for reporting automation.</div>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div class="workspace-topbar">
+        <div class="topbar-links"></div>
+        <div class="topbar-meta">
+          <div class="topbar-badge">DEV</div>
+          <div class="topbar-lang">RS</div>
+        </div>
+      </div>
+
+      <header class="workspace-header">
+        <div>
+          <div class="eyebrow">Create Template</div>
+          <h1>Create a report template from a question URL.</h1>
+          <p class="page-copy">
+            Keep only the source URL, schedule, and email details needed to automate the report.
+          </p>
+        </div>
+
+        <div class="header-actions">
+          <button type="button" class="button button-primary" id="save-template">Save Template</button>
+        </div>
+      </header>
+
+      <div class="workspace-grid">
+        <section class="builder-column">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-eyebrow">Template</div>
+                <h2>Source, schedule, and email</h2>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span class="field-label">Template name</span>
+                <input id="template-name" type="text" value="Operator Sessions Daily Export">
+              </label>
+
+              <label class="field">
+                <span class="field-label">Question URL</span>
+                <input id="question-url" type="url" value="https://metabase-dev.shargethailand.com/question/45">
+              </label>
+
+              <label class="field">
+                <span class="field-label">Workbook file pattern</span>
+                <input id="file-pattern" type="text" value="operator_sessions_{{run_date}}.xlsx">
+              </label>
+
+              <label class="field">
+                <span class="field-label">Start date</span>
+                <input id="start-date" type="date" value="2026-04-03">
+              </label>
+
+              <div class="field">
+                <span class="field-label">Frequency</span>
+                <div class="segmented-control" id="frequency-control">
+                  <button type="button" class="segment segment-active" data-frequency="daily">Daily</button>
+                  <button type="button" class="segment" data-frequency="weekly">Weekly</button>
+                  <button type="button" class="segment" data-frequency="monthly">Monthly</button>
+                </div>
+              </div>
+
+              <label class="field">
+                <span class="field-label">Run time</span>
+                <input id="run-time" type="time" value="07:00">
+              </label>
+
+              <label class="field">
+                <span class="field-label">Timezone</span>
+                <input id="timezone" type="text" value="Asia/Bangkok">
+              </label>
+
+              <label class="field field-span-2 monthly-field" id="monthly-day-field">
+                <span class="field-label">Day of month</span>
+                <input id="monthly-day" type="number" min="1" max="31" value="1">
+              </label>
+
+              <div class="field field-span-2 weekday-panel" id="weekday-panel">
+                <span class="field-label">Weekdays</span>
+                <div class="weekday-list" id="weekday-list"></div>
+              </div>
+
+              <div class="field field-span-2">
+                <span class="field-label">Enable schedule</span>
+                <div class="toggle-row">
+                  <label class="switch">
+                    <input id="schedule-enabled" type="checkbox" checked>
+                    <span class="switch-track"></span>
+                  </label>
+                  <span class="helper-copy">Turn this off if the template should be run manually only.</span>
+                </div>
+              </div>
+
+              <label class="field field-span-2">
+                <span class="field-label">Recipients</span>
+                <div class="recipient-entry">
+                  <input id="recipient-input" type="email" placeholder="name@company.com">
+                  <button type="button" class="button button-secondary" id="add-recipient">Add</button>
+                </div>
+                <div class="recipient-list" id="recipient-list"></div>
+              </label>
+
+              <label class="field field-span-2">
+                <span class="field-label">Email subject</span>
+                <input id="email-subject" type="text" value="[DEV] Operator Sessions - {{run_date}}">
+              </label>
+
+              <label class="field field-span-2">
+                <span class="field-label">Email body</span>
+                <textarea id="email-body" rows="5">Hello team,
+
+Please find the attached report for {{run_date}}.
+
+Regards,
+Report Studio</textarea>
+              </label>
+            </div>
+          </section>
+        </section>
+
+        <aside class="preview-column">
+          <section class="panel preview-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-eyebrow">Summary</div>
+                <h2 id="preview-title">Operator Sessions Daily Export</h2>
+              </div>
+              <div class="preview-status">Draft</div>
+            </div>
+
+            <div class="summary-stack">
+              <div class="summary-block">
+                <div class="summary-label">Question</div>
+                <div class="summary-value" id="preview-source"></div>
+              </div>
+              <div class="summary-block">
+                <div class="summary-label">File name</div>
+                <div class="summary-value" id="preview-filename"></div>
+              </div>
+              <div class="summary-block">
+                <div class="summary-label">Schedule</div>
+                <div class="summary-value" id="preview-schedule"></div>
+              </div>
+              <div class="summary-block">
+                <div class="summary-label">Recipients</div>
+                <div class="summary-value" id="preview-recipients"></div>
+              </div>
+              <div class="summary-block">
+                <div class="summary-label">Email subject</div>
+                <div class="summary-value" id="preview-email-subject"></div>
+              </div>
+              <div class="summary-block">
+                <div class="summary-label">Next runs</div>
+                <div class="run-list compact-run-list" id="upcoming-runs"></div>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="./app-minimal.js"></script>
+</body>
+</html>

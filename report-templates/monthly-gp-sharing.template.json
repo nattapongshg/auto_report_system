@@ -1,0 +1,120 @@
+{
+  "templateId": "monthly-gp-sharing-v1",
+  "templateName": "Monthly GP Sharing Report",
+  "description": "Monthly settlement template based on raw Metabase export plus manual electricity cost input.",
+  "source": {
+    "type": "metabase-question",
+    "questionUrl": "REPLACE_WITH_METABASE_QUESTION_URL",
+    "expectedGrain": "monthly",
+    "rawMetrics": [
+      "session_count",
+      "total_kwh",
+      "gross_revenue"
+    ]
+  },
+  "schedule": {
+    "enabled": true,
+    "frequency": "monthly",
+    "startDate": "2026-04-01",
+    "dayOfMonth": 1,
+    "runTime": "07:00",
+    "timezone": "Asia/Bangkok"
+  },
+  "delivery": {
+    "fileNamePattern": "gp_sharing_{{billing_month}}.xlsx",
+    "recipients": [
+      "finance@company.com",
+      "ops@company.com"
+    ],
+    "emailSubject": "Monthly GP Sharing Report - {{billing_month}}",
+    "emailBody": "Hello team,\n\nPlease find attached the GP Sharing report for {{billing_month}}.\n\nRegards,\nReport Studio"
+  },
+  "manualInputs": [
+    {
+      "key": "billing_month",
+      "label": "Billing Month",
+      "type": "month",
+      "required": true
+    },
+    {
+      "key": "electricity_cost_baht",
+      "label": "Electricity Cost (THB)",
+      "type": "number",
+      "required": true
+    },
+    {
+      "key": "revenue_rate_per_kwh",
+      "label": "Revenue Rate per kWh",
+      "type": "number",
+      "required": true,
+      "defaultValue": 6.4
+    },
+    {
+      "key": "adjustment_baht",
+      "label": "Adjustment (THB)",
+      "type": "number",
+      "required": false,
+      "defaultValue": 0
+    }
+  ],
+  "calculations": [
+    {
+      "key": "gross_revenue_baht",
+      "label": "Gross Revenue",
+      "formula": "total_kwh * revenue_rate_per_kwh"
+    },
+    {
+      "key": "net_revenue_baht",
+      "label": "Net Revenue",
+      "formula": "gross_revenue_baht + adjustment_baht"
+    },
+    {
+      "key": "gross_profit_baht",
+      "label": "Gross Profit",
+      "formula": "net_revenue_baht - electricity_cost_baht"
+    },
+    {
+      "key": "owner_share_baht",
+      "label": "Owner Share",
+      "formula": "gross_profit_baht * 0.05"
+    },
+    {
+      "key": "partner_share_45_baht",
+      "label": "Partner Share 45%",
+      "formula": "gross_profit_baht * 0.45"
+    },
+    {
+      "key": "partner_share_55_baht",
+      "label": "Partner Share 55%",
+      "formula": "gross_profit_baht * 0.55"
+    }
+  ],
+  "output": {
+    "summaryFields": [
+      "billing_month",
+      "session_count",
+      "total_kwh",
+      "gross_revenue_baht",
+      "electricity_cost_baht",
+      "gross_profit_baht",
+      "owner_share_baht",
+      "partner_share_45_baht",
+      "partner_share_55_baht"
+    ],
+    "worksheets": [
+      {
+        "name": "Summary",
+        "type": "summary"
+      },
+      {
+        "name": "Raw Data",
+        "type": "raw"
+      }
+    ]
+  },
+  "notes": [
+    "Replace questionUrl after receiving the Metabase link.",
+    "If gross_revenue is already available from Metabase, change formula of gross_revenue_baht accordingly.",
+    "Sharing percentages should be verified against the actual contract rule before production use."
+  ]
+}
