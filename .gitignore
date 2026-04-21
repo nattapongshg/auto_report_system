@@ -23,6 +23,7 @@ dist/
 backend/data/*.json
 backend/output/*.xlsx
 backend/uploads/*
+*-raw.json
 
 # Keep structure
 !backend/data/.gitkeep
