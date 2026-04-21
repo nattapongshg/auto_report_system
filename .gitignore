@@ -46,6 +46,33 @@ Thumbs.db
 !backend/**/*.sql
 !report-templates/**/*.xlsx
 
+# Legacy Supabase SQL (consolidated into backend/db/init/*.sql)
+backend/supabase_*.sql
+
+# Legacy standalone scripts (superseded by the FastAPI workflow)
+backend/send_*_reports.py
+backend/generate_report.py
+backend/create_question_v2.py
+backend/send_test_email.py
+
+# Unused alembic scaffolding (we init schema via docker entrypoint instead)
+backend/alembic/
+backend/alembic.ini
+
+# Legacy SQLAlchemy models/schemas/scheduler (Templates/Jobs system removed)
+backend/app/database.py
+backend/app/models/
+backend/app/schemas/
+backend/app/scheduler/
+
+# Notes that don't belong in a shared repo
+AGENTS.md
+SYSTEM_MAP.md
+privilege-analysis.txt
+test-bill.png
+report-template-ui/
+report-templates/
+
 # Local sub-repos (Sharge codebases pulled down for reference)
 sharge-admin/
 sharge-backend/
