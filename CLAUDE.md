@@ -61,7 +61,8 @@ frontend/src/
 ## Data model — Supabase tables
 
 - `locations` — master list (757 rows). Key columns: `name`, `station_code`, `group_name`, `is_report_enabled`, `location_share_rate`, `transaction_fee_rate`, `electricity_cost`, `internet_cost`, `etax`, `email_recipients[]`.
-- `monthly_snapshots` — one per (year_month, question_id) fetch. Status: `fetching | completed | failed`. Stores `file_path` pointing to `data/<ym>.json`.
+- `monthly_snapshots` — one per (year_month, question_id) fetch. Status: `fetching | completed | failed`.
+- `metabase_rows` — raw Q1144 rows for every snapshot (replaces the old `data/<ym>.json` files). Queried via `app/db/raw_rows.py` (asyncpg COPY for bulk insert).
 - `monthly_location_inputs` — per-location entry for a snapshot. Status: `pending | generating | sent | failed`. Holds user-entered costs + computed preview (revenue/gp/share) + output file info.
 - `group_report_inputs` — same idea but per group. Unique on (snapshot_id, group_name).
 - `report_schedules` — recurring jobs (location_ids + trigger_day 1-28 + last_run tracking).

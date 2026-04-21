@@ -49,6 +49,11 @@ python deploy/migrate-from-supabase.py
 Runs table-by-table in FK order with `INSERT ... ON CONFLICT DO UPDATE`, so
 safe to re-run.
 
+**Note:** `metabase_rows` (raw Q1144 data) is NOT migrated — it would be 100+MB
+per month via REST. Just re-fetch snapshots on the new box via the UI's
+**Fetch Data** button, or from your laptop run `deploy/backfill-raw-rows.py`
+against the new DB to push existing local JSON files.
+
 ## Redeploy (updates)
 
 ```bash

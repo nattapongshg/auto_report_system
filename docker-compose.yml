@@ -47,6 +47,7 @@ services:
       SUPABASE_URL: http://postgrest:3000
       SUPABASE_SERVICE_KEY: ${SERVICE_JWT}       # signed w/ JWT_SECRET, role=service_role
       SUPABASE_ANON_KEY: ${ANON_JWT}             # signed w/ JWT_SECRET, role=anon
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-auto_report}
       METABASE_BASE_URL: ${METABASE_BASE_URL}
       METABASE_API_KEY: ${METABASE_API_KEY}
       SMTP_HOST: ${SMTP_HOST}

@@ -14,6 +14,7 @@ from app.supabase_client import supabase
 from app.engine.privilege_calc import process_rows, refresh_cache
 from app.engine.excel_builder import build_report
 from app.engine.email_service import send_report_email
+from app.db.raw_rows import load_snapshot_rows
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 
@@ -98,20 +99,17 @@ async def init_month(snapshot_id: str):
 
     locations = await supabase.select("locations", "is_report_enabled=eq.true&order=name.asc")
 
-    file_path = snapshot.get("file_path")
     loc_counts: dict[str, int] = {}
     etax_counts: dict[str, int] = {}
     loc_revenue: dict[str, float] = {}
     loc_kwh: dict[str, float] = {}
 
-    if file_path and os.path.exists(file_path):
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        col_names = data["cols"]
+    raw_rows, col_names = await load_snapshot_rows(snapshot_id)
+    if raw_rows:
         loc_idx = col_names.index("location_name")
         etax_idx = col_names.index("etax_number") if "etax_number" in col_names else None
         kwh_idx = col_names.index("kwh") if "kwh" in col_names else None
-        for r in data["rows"]:
+        for r in raw_rows:
             loc = r[loc_idx]
             if not loc:
                 continue
@@ -124,7 +122,7 @@ async def init_month(snapshot_id: str):
 
         # Compute per-location revenue + kwh using privilege logic (accurate preview)
         await refresh_cache()
-        all_processed = await process_rows(data["rows"], col_names, None)
+        all_processed = await process_rows(raw_rows, col_names, None)
         for row in all_processed:
             loc = row.get("location_name")
             if not loc:
@@ -237,16 +235,15 @@ async def _save_inputs(entry: dict, payload: SubmitInputs | BulkSubmitEntry,
 
 
 async def _load_snapshot_data(snapshot_id: str) -> tuple[dict, list, list]:
-    """Load snapshot + raw rows + col names. Returns (snapshot, rows, cols)."""
+    """Load snapshot + raw rows + col names. Returns (snapshot, rows, cols).
+
+    Rows come from `metabase_rows` (was on-disk JSON before).
+    """
     snapshot = await supabase.select("monthly_snapshots", f"id=eq.{snapshot_id}", single=True)
     if not snapshot:
         raise HTTPException(404, "Snapshot not found")
-    file_path = snapshot.get("file_path")
-    if not file_path or not os.path.exists(file_path):
-        return snapshot, [], []
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return snapshot, data["rows"], data["cols"]
+    rows, cols = await load_snapshot_rows(snapshot_id)
+    return snapshot, rows, cols
 
 
 @router.put("/{snapshot_id}/save/{entry_id}")
@@ -345,13 +342,9 @@ async def _generate_and_send_task(snapshot_id: str, items: list,
                                   email_overrides: dict[str, list[str]] | None = None,
                                   skip_emails: set[str] | None = None):
     snapshot = await supabase.select("monthly_snapshots", f"id=eq.{snapshot_id}", single=True)
-    file_path = snapshot.get("file_path")
     year_month = snapshot["year_month"]
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    raw_rows = data["rows"]
-    col_names = data["cols"]
+    raw_rows, col_names = await load_snapshot_rows(snapshot_id)
 
     await refresh_cache()
 

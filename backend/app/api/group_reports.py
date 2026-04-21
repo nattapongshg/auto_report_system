@@ -17,6 +17,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 from app.engine.excel_builder import build_report
+from app.db.raw_rows import load_snapshot_rows
 from app.engine.email_service import send_report_email
 
 router = APIRouter(prefix="/group-reports", tags=["group-reports"])
@@ -114,16 +115,12 @@ async def preview_group(snapshot_id: str, group_name: str):
     )
     loc_names = {l["name"] for l in locs}
 
-    file_path = snap.get("file_path")
-    if not file_path or not os.path.exists(file_path):
-        raise HTTPException(400, "Snapshot data missing")
-
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    cols = data["cols"]
+    raw_rows, cols = await load_snapshot_rows(snap["id"])
+    if not raw_rows:
+        raise HTTPException(400, "Snapshot has no rows")
 
     await refresh_cache()
-    processed = await process_rows(data["rows"], cols, None)
+    processed = await process_rows(raw_rows, cols, None)
     group_rows = [r for r in processed if r.get("location_name") in loc_names]
     revenue = sum(float(r.get("_revenue") or 0) for r in group_rows)
     kwh = sum(float(r.get("kwh") or 0) for r in group_rows)
@@ -192,12 +189,8 @@ async def _generate_group_task(snap: dict, payload: GroupSendRequest, entry_id: 
             raise RuntimeError(f"No active locations in group {group}")
         loc_names = {l["name"] for l in locs}
 
-        # 2. Load snapshot and filter rows to this group
-        file_path = snap.get("file_path")
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        cols = data["cols"]
-        raw_rows = data["rows"]
+        # 2. Load snapshot rows from DB and filter to this group
+        raw_rows, cols = await load_snapshot_rows(snap["id"])
 
         await refresh_cache()
         all_processed = await process_rows(raw_rows, cols, None)

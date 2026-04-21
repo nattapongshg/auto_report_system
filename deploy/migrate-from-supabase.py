@@ -22,7 +22,9 @@ import httpx
 
 
 TABLES_IN_ORDER = [
-    # Parents first → children last (FK order)
+    # Parents first → children last (FK order).
+    # metabase_rows is populated by re-fetching snapshots on the new box,
+    # not migrated — it would be 100+ MB per month via REST.
     "locations",
     "privilege_configs",
     "monthly_snapshots",

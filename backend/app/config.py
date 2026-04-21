@@ -7,8 +7,9 @@ class Settings(BaseSettings):
     supabase_service_key: str = ""
     supabase_anon_key: str = ""
 
-    # Legacy (unused, kept for reference)
-    database_url: str = ""
+    # Postgres direct (for bulk ops — raw rows insert/query).
+    # Compose points this at the internal service; dev can override.
+    database_url: str = "postgresql://postgres:postgres@postgres:5432/auto_report"
 
     # Email (SMTP)
     smtp_host: str = ""

@@ -15,6 +15,7 @@ from app.supabase_client import supabase
 from app.engine.fetcher import fetch_date_range
 from app.engine.privilege_calc import process_rows, refresh_cache
 from app.engine.excel_builder import build_report
+from app.db.raw_rows import delete_snapshot_rows, insert_snapshot_rows, load_snapshot_rows
 
 router = APIRouter(prefix="/monthly", tags=["monthly"])
 
@@ -92,18 +93,17 @@ async def _fetch_snapshot_task(snapshot_id: str, year_month: str, question_id: i
             on_progress=lambda msg: logger.info("snapshot: %s", msg)
         )
 
-        # Save to JSON file
-        file_path = os.path.join(DATA_DIR, f"{year_month}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({"cols": col_names, "rows": rows, "total": len(rows)}, f, ensure_ascii=False)
+        # Clear any partial rows from prior failed attempts, then bulk-copy
+        await delete_snapshot_rows(snapshot_id)
+        inserted = await insert_snapshot_rows(snapshot_id, rows, col_names)
 
         await supabase.update("monthly_snapshots", f"id=eq.{snapshot_id}", {
             "status": "completed",
-            "total_rows": len(rows),
-            "file_path": file_path,
+            "total_rows": inserted,
+            "file_path": None,  # rows now live in metabase_rows
             "fetched_at": datetime.now(timezone.utc).isoformat(),
         })
-        logger.info("Snapshot done: %d rows → %s", len(rows), file_path)
+        logger.info("Snapshot done: %d rows stored in DB", inserted)
 
     except Exception as e:
         await supabase.update("monthly_snapshots", f"id=eq.{snapshot_id}", {
@@ -175,15 +175,11 @@ async def _batch_run_task(batch_id: str, snapshot: dict):
             "started_at": datetime.now(timezone.utc).isoformat(),
         })
 
-        # Load raw data
-        file_path = snapshot["file_path"]
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        raw_rows = data["rows"]
-        col_names = data["cols"]
+        # Load raw rows from DB
+        raw_rows, col_names = await load_snapshot_rows(snapshot["id"])
         year_month = snapshot["year_month"]
 
-        logger.info("Batch loaded %d rows from %s", len(raw_rows), file_path)
+        logger.info("Batch loaded %d rows for snapshot %s", len(raw_rows), snapshot["id"])
 
         # Refresh privilege cache
         await refresh_cache()
