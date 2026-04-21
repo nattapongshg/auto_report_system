@@ -1,0 +1,38 @@
+{
+	# Set via docker-compose env: ACME_EMAIL=ops@yourdomain.com
+	email {$ACME_EMAIL:admin@localhost}
+}
+
+# Replace with your real domain; for LAN/dev use :80 or a local hostname.
+{$SITE_ADDRESS:http://} {
+	encode zstd gzip
+
+	# API — proxy everything under /api/* to the FastAPI backend.
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Health endpoint passthrough.
+	handle /health {
+		reverse_proxy backend:8000
+	}
+
+	# Generated Excel files — served from the shared volume.
+	handle /output/* {
+		root * /srv-output
+		uri strip_prefix /output
+		file_server
+	}
+
+	# Static frontend (Vite build output)
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,29 +1,89 @@
 services:
+  # ─── Database ────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: auto_report
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-auto_report}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./backend/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Not exposed publicly — only reachable within docker network
+    # ports:
+    #   - "127.0.0.1:5432:5432"  # uncomment for local DB access
 
+  # ─── PostgREST (drop-in replacement for Supabase REST layer) ────
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-auto_report}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-change-me-32-chars-minimum-for-dev}
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
+    # Internal-only; backend talks to it on the docker network
+    # ports:
+    #   - "127.0.0.1:3000:3000"
+
+  # ─── FastAPI backend ─────────────────────────────────────────────
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/auto_report
-      METABASE_BASE_URL: ${METABASE_BASE_URL:-https://metabase-dev.shargethailand.com}
-      METABASE_API_KEY: ${METABASE_API_KEY:-}
-      APP_ENV: development
+    restart: unless-stopped
     depends_on:
-      - postgres
+      - postgrest
+    environment:
+      # PostgREST endpoint (internal docker network)
+      SUPABASE_URL: http://postgrest:3000
+      SUPABASE_SERVICE_KEY: ${SERVICE_JWT}       # signed w/ JWT_SECRET, role=service_role
+      SUPABASE_ANON_KEY: ${ANON_JWT}             # signed w/ JWT_SECRET, role=anon
+      METABASE_BASE_URL: ${METABASE_BASE_URL}
+      METABASE_API_KEY: ${METABASE_API_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_USE_TLS: "true"
+      APP_ENV: ${APP_ENV:-production}
     volumes:
-      - ./backend:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - backend_output:/app/output
+      - backend_uploads:/app/uploads
+      - backend_data:/app/data
+    # Internal-only; caddy reverse-proxies /api/* → backend:8000
+    # ports:
+    #   - "127.0.0.1:8000:8000"
+
+  # ─── Frontend (static) + reverse proxy ───────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv:ro
+      - backend_output:/srv-output:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
+  backend_output:
+  backend_uploads:
+  backend_data:
+  caddy_data:
+  caddy_config:
