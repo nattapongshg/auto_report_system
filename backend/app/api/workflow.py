@@ -1,5 +1,6 @@
 """Monthly report workflow: pending_input → submitted → approved → sent."""
 
+import asyncio
 import logging
 import os
 import json
@@ -14,7 +15,10 @@ from app.supabase_client import supabase
 from app.engine.privilege_calc import process_rows, refresh_cache
 from app.engine.excel_builder import build_report
 from app.engine.email_service import send_report_email
+from app.engine.share_calc import compute_totals
 from app.db.raw_rows import load_snapshot_rows
+from app.db.payment_rows import load_payment_rows
+from app.engine.payment_calc import process_payment_rows
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 
@@ -34,19 +38,15 @@ ETAX_PER_DOC = 1  # THB per e-tax document (pre-VAT); final cost adds 7% VAT dow
 def _compute_preview(revenue: float, electricity: float, internet: float,
                      etax: float,
                      *, tx_fee_rate: float = TX_FEE_RATE,
-                     share_rate: float = LOCATION_SHARE_RATE) -> dict:
-    """Compute GP preview from revenue + costs. Single source of truth."""
-    tx_fee = revenue * tx_fee_rate
-    vat_on_fee = tx_fee * VAT_RATE
-    total_fee = tx_fee + vat_on_fee
-    internet_vat = internet * (1 + VAT_RATE)
-    etax_vat = etax * (1 + VAT_RATE)
-    remaining = revenue - total_fee - electricity - internet_vat - etax_vat
-    share = remaining * share_rate
+                     share_rate: float = LOCATION_SHARE_RATE,
+                     share_basis: str = 'gp') -> dict:
+    t = compute_totals(revenue, electricity, internet, etax,
+                       tx_fee_rate=tx_fee_rate, share_rate=share_rate,
+                       share_basis=share_basis)
     return {
         "preview_revenue": round(revenue, 2),
-        "preview_gp": round(remaining, 2),
-        "preview_share": round(share, 2),
+        "preview_gp": round(t["remaining"], 2),
+        "preview_share": round(t["location_share"], 2),
     }
 
 
@@ -59,15 +59,17 @@ async def _fetch_location_configs(location_ids: list[str]) -> dict[str, dict]:
     return {r["id"]: r for r in rows}
 
 
-def _rates_from_config(loc_config: dict | None) -> tuple[float, float]:
-    """Return (tx_fee_rate, share_rate) with sensible fallbacks."""
+def _rates_from_config(loc_config: dict | None) -> tuple[float, float, str]:
+    """Return (tx_fee_rate, share_rate, share_basis) with sensible fallbacks."""
     if not loc_config:
-        return TX_FEE_RATE, LOCATION_SHARE_RATE
+        return TX_FEE_RATE, LOCATION_SHARE_RATE, 'gp'
     tx = loc_config.get("transaction_fee_rate")
     share = loc_config.get("location_share_rate")
+    basis = loc_config.get("share_basis") or 'gp'
     return (
         float(tx) if tx is not None else TX_FEE_RATE,
         float(share) if share is not None else LOCATION_SHARE_RATE,
+        basis,
     )
 
 
@@ -97,7 +99,18 @@ async def init_month(snapshot_id: str):
         )
         return {"items": items, "total": len(items)}
 
-    locations = await supabase.select("locations", "is_report_enabled=eq.true&order=name.asc")
+    locations = await supabase.select("locations", "is_active=eq.true&order=name.asc")
+
+    # Pull uploaded electricity bills for this period so we can pre-fill
+    # electricity_cost per location (keyed off locations.ca). `total` is
+    # VAT-inclusive: for MEA it's the bill's Total column; for PEA it's the
+    # AMOUNT column (which is already VAT-inclusive — the PEA VAT column is
+    # informational only).
+    bills = await supabase.select(
+        "electricity_bills",
+        f"year_month=eq.{year_month}&select=ca,total",
+    )
+    bill_by_ca: dict[str, float] = {b["ca"]: float(b["total"]) for b in bills if b.get("ca") and b.get("total") is not None}
 
     loc_counts: dict[str, int] = {}
     etax_counts: dict[str, int] = {}
@@ -135,13 +148,14 @@ async def init_month(snapshot_id: str):
         row_count = loc_counts.get(loc["name"], 0)
         etax_count = etax_counts.get(loc["name"], 0)
         etax_value = etax_count * ETAX_PER_DOC if etax_count else (loc.get("etax") or DEFAULT_ETAX)
+        elec_from_bill = bill_by_ca.get(loc.get("ca")) if loc.get("ca") else None
         rows_to_insert.append({
             "snapshot_id": snapshot_id,
             "location_id": loc["id"],
             "location_name": loc["name"],
             "year_month": year_month,
             "status": "pending",
-            "electricity_cost": loc.get("electricity_cost") or 0,
+            "electricity_cost": elec_from_bill if elec_from_bill is not None else (loc.get("electricity_cost") or 0),
             "internet_cost": loc.get("internet_cost") or DEFAULT_INTERNET_COST,
             "etax": etax_value,
             "preview_rows": row_count,
@@ -206,7 +220,7 @@ async def _save_inputs(entry: dict, payload: SubmitInputs | BulkSubmitEntry,
     """Save costs + compute preview. Status stays 'pending'. Returns updated row."""
     loc_name = entry["location_name"]
     processed = processed_by_loc.get(loc_name, [])
-    tx_rate, share_rate = _rates_from_config(loc_config)
+    tx_rate, share_rate, share_basis = _rates_from_config(loc_config)
 
     preview = {"preview_rows": len(processed)}
     if processed:
@@ -220,6 +234,7 @@ async def _save_inputs(entry: dict, payload: SubmitInputs | BulkSubmitEntry,
             payload.etax,
             tx_fee_rate=tx_rate,
             share_rate=share_rate,
+            share_basis=share_basis,
         ))
 
     update = {
@@ -343,145 +358,215 @@ async def _generate_and_send_task(snapshot_id: str, items: list,
                                   skip_emails: set[str] | None = None):
     snapshot = await supabase.select("monthly_snapshots", f"id=eq.{snapshot_id}", single=True)
     year_month = snapshot["year_month"]
+    question_id = snapshot.get("question_id") or 1144
+    use_payment_centric = question_id == 1145
 
-    raw_rows, col_names = await load_snapshot_rows(snapshot_id)
-
+    target_locs = {item["location_name"] for item in items}
     await refresh_cache()
 
-    # Process + group rows by location in a single pass.
-    target_locs = {item["location_name"] for item in items}
-    all_processed = await process_rows(raw_rows, col_names, None)
     processed_by_loc: dict = {}
-    for row in all_processed:
-        loc = row.get("location_name")
-        if loc in target_locs:
-            processed_by_loc.setdefault(loc, []).append(row)
+    if use_payment_centric:
+        # Payment-centric (Q1145): 1 row per payment, ordered so the primary
+        # payment of each invoice comes first so the Excel renders:
+        #   invoice row 1 → full fields
+        #   invoice row 2+ → minimal (just payment amount + privilege)
+        raw_rows, col_names = await load_payment_rows(
+            snapshot_id, location_names=list(target_locs)
+        )
+        all_processed = await process_payment_rows(raw_rows, col_names, None)
+        # sort by invoice_id then is_invoice_primary DESC so primary is first
+        all_processed.sort(
+            key=lambda r: (r.get("invoice_id") or "", not r.get("is_invoice_primary", False))
+        )
+
+        # Propagate privilege / discount label from the credit sibling payment
+        # up to the primary row so the primary line shows "Privilege Name"
+        # (otherwise stripe-paid primary would have no privilege on display
+        # even though the invoice used a credit).
+        # Also sum discount from non-primary tier payments onto the primary
+        # as Total Discount (informational column, matches reference layout).
+        inv_priv: dict = {}
+        inv_dl: dict = {}
+        inv_discount_sum: dict = {}
+        for r in all_processed:
+            inv = r.get("invoice_id")
+            if not inv:
+                continue
+            if r.get("privilege_program_name") and inv not in inv_priv:
+                inv_priv[inv] = r["privilege_program_name"]
+            if r.get("discount_label") and inv not in inv_dl:
+                inv_dl[inv] = r["discount_label"]
+            # Aggregate discount value from secondary tier/credit rows whose
+            # revenue was zeroed out (percent-type privilege discount).
+            if not r.get("is_invoice_primary") and float(r.get("_revenue") or 0) == 0:
+                inv_discount_sum[inv] = inv_discount_sum.get(inv, 0.0) + float(r.get("payment_amount") or 0)
+
+        filtered: list[dict] = []
+        for r in all_processed:
+            inv = r.get("invoice_id")
+            if r.get("is_invoice_primary") and inv:
+                if not r.get("privilege_program_name") and inv in inv_priv:
+                    r["privilege_program_name"] = inv_priv[inv]
+                if not r.get("discount_label") and inv in inv_dl:
+                    r["discount_label"] = inv_dl[inv]
+                # Display tier/zero-revenue discount sum in Total Discount col
+                if inv in inv_discount_sum:
+                    r["total_discount"] = inv_discount_sum[inv]
+                filtered.append(r)
+            else:
+                # Skip non-primary rows that contribute no revenue (tier
+                # discount entries). Keep any with revenue > 0 (actual credit
+                # contributions like FGF, Mercedes credit, etc.).
+                if float(r.get("_revenue") or 0) != 0:
+                    filtered.append(r)
+
+        for row in filtered:
+            loc = row.get("location_name")
+            if loc in target_locs:
+                processed_by_loc.setdefault(loc, []).append(row)
+    else:
+        raw_rows, col_names = await load_snapshot_rows(
+            snapshot_id, location_names=list(target_locs)
+        )
+        all_processed = await process_rows(raw_rows, col_names, None)
+        for row in all_processed:
+            loc = row.get("location_name")
+            if loc in target_locs:
+                processed_by_loc.setdefault(loc, []).append(row)
 
     # Fetch all location configs upfront (one DB round-trip)
     loc_configs = await _fetch_location_configs(list({i["location_id"] for i in items}))
 
-    for item in items:
+    # Build Excel (CPU) + SMTP (I/O) are sync — run them in threads and fan
+    # out across items. Semaphore caps concurrency so we don't exhaust the
+    # SMTP server or spin up 100 threads for a big batch.
+    sem = asyncio.Semaphore(6)
+
+    def _render(loc_name: str, processed: list, manual_inputs: dict, bill_path: str | None) -> tuple[str, int]:
+        excel_bytes = build_report(
+            rows=processed, location_name=loc_name,
+            manual_inputs=manual_inputs, bill_image_path=bill_path,
+        )
+        safe_name = loc_name.replace(" ", "_").replace("/", "_")[:50]
+        filename = f"{safe_name}_{year_month}.xlsx"
+        output_path = os.path.join(OUTPUT_DIR, filename)
+        with open(output_path, "wb") as f:
+            f.write(excel_bytes.read())
+        return output_path, os.path.getsize(output_path), filename  # type: ignore
+
+    async def _process_item(item: dict):
         loc_name = item["location_name"]
-        try:
-            await supabase.update("monthly_location_inputs", f"id=eq.{item['id']}", {"status": "generating"})
+        async with sem:
+            try:
+                processed = processed_by_loc.get(loc_name, [])
 
-            processed = processed_by_loc.get(loc_name, [])
+                if not processed:
+                    await supabase.update("monthly_location_inputs", f"id=eq.{item['id']}", {
+                        "status": "sent", "preview_rows": 0,
+                    })
+                    return
 
-            if not processed:
-                await supabase.update("monthly_location_inputs", f"id=eq.{item['id']}", {
-                    "status": "sent", "preview_rows": 0,
-                })
-                continue
+                # Resolve bill image path (sync fs check, fast)
+                bill_path = None
+                if item.get("bill_image_url"):
+                    local = os.path.join(os.path.dirname(__file__), "..", "..", "uploads",
+                                         os.path.basename(item["bill_image_url"]))
+                    if os.path.exists(local):
+                        bill_path = local
 
-            # Get bill image
-            bill_path = None
-            if item.get("bill_image_url"):
-                local = os.path.join(os.path.dirname(__file__), "..", "..", "uploads",
-                                     os.path.basename(item["bill_image_url"]))
-                if os.path.exists(local):
-                    bill_path = local
+                loc_config = loc_configs.get(item["location_id"])
+                tx_rate, share_rate, share_basis = _rates_from_config(loc_config)
 
-            loc_config = loc_configs.get(item["location_id"])
-            tx_rate, share_rate = _rates_from_config(loc_config)
+                # Pull internet_cost LIVE from locations so edits on the
+                # Locations page take effect on next generate (not frozen at
+                # init_month time). Falls back to the per-entry value, then
+                # DEFAULT_INTERNET_COST.
+                live_internet = (loc_config or {}).get("internet_cost")
+                if live_internet is None:
+                    live_internet = item.get("internet_cost") or DEFAULT_INTERNET_COST
 
-            manual_inputs = {
-                "date_start": f"{year_month}-01",
-                "date_end": f"{year_month}-28",
-                "electricity_cost": float(item.get("electricity_cost") or 0),
-                "internet_cost": float(item.get("internet_cost") or DEFAULT_INTERNET_COST),
-                "etax": float(item.get("etax") or DEFAULT_ETAX),
-                "transaction_fee_rate": tx_rate,
-                "location_share_rate": share_rate,
-            }
+                from app.engine.template_repo import resolve_for_location
+                group_name = (loc_config or {}).get("group_name")
+                report_template = await resolve_for_location(loc_config, group_name)
 
-            excel_bytes = build_report(
-                rows=processed,
-                location_name=loc_name,
-                manual_inputs=manual_inputs,
-                bill_image_path=bill_path,
-            )
-
-            safe_name = loc_name.replace(" ", "_").replace("/", "_")[:50]
-            filename = f"{safe_name}_{year_month}.xlsx"
-            output_path = os.path.join(OUTPUT_DIR, filename)
-
-            with open(output_path, "wb") as f:
-                f.write(excel_bytes.read())
-            file_size = os.path.getsize(output_path)
-
-            # Send email — prefer per-request override, fallback to location config
-            skip_email = skip_emails is not None and item["id"] in skip_emails
-            override = (email_overrides or {}).get(item["id"]) if email_overrides else None
-            recipients = override if override is not None else ((loc_config or {}).get("email_recipients") or [])
-
-            email_sent = None
-            email_error = None
-            if recipients and not skip_email:
-                # Build summary to embed in the email body (matches Excel Summary sheet)
-                revenue = sum(float(r.get("_revenue", 0)) for r in processed)
-                tx_fee = revenue * tx_rate
-                vat_on_fee = tx_fee * VAT_RATE
-                total_fee = tx_fee + vat_on_fee
-                internet_incl_vat = manual_inputs["internet_cost"] * (1 + VAT_RATE)
-                etax_incl_vat = manual_inputs["etax"] * (1 + VAT_RATE)
-                remaining = (revenue - total_fee - manual_inputs["electricity_cost"]
-                             - internet_incl_vat - etax_incl_vat)
-                location_share = remaining * share_rate
-                before_vat = location_share / (1 + VAT_RATE)
-                vat_portion = location_share - before_vat
-
-                email_summary = {
-                    "revenue": revenue,
-                    "tx_fee_rate": tx_rate,
-                    "vat_rate": VAT_RATE,
+                manual_inputs = {
+                    "date_start": f"{year_month}-01",
+                    "date_end": f"{year_month}-28",
+                    "electricity_cost": float(item.get("electricity_cost") or 0),
+                    "internet_cost": float(live_internet),
+                    "etax": float(item.get("etax") or DEFAULT_ETAX),
+                    "transaction_fee_rate": tx_rate,
                     "location_share_rate": share_rate,
-                    "tx_fee": tx_fee,
-                    "vat_on_fee": vat_on_fee,
-                    "total_fee": total_fee,
-                    "electricity_cost": manual_inputs["electricity_cost"],
-                    "internet_cost": manual_inputs["internet_cost"],
-                    "internet_incl_vat": internet_incl_vat,
-                    "etax": manual_inputs["etax"],
-                    "etax_incl_vat": etax_incl_vat,
-                    "remaining": remaining,
-                    "location_share": location_share,
-                    "vat_portion": vat_portion,
-                    "before_vat": before_vat,
+                    "share_basis": share_basis,
+                    "group_name": group_name,
+                    "evse_count": (loc_config or {}).get("evse_count"),
+                    "report_template": report_template,
                 }
 
-                result = send_report_email(
-                    to=recipients,
-                    location_name=loc_name,
-                    year_month=year_month,
-                    file_path=output_path,
-                    file_name=filename,
-                    summary=email_summary,
+                output_path, file_size, filename = await asyncio.to_thread(
+                    _render, loc_name, processed, manual_inputs, bill_path
                 )
-                if result.get("status") == "sent":
-                    email_sent = datetime.now(timezone.utc).isoformat()
-                else:
-                    email_error = result.get("error") or "Email provider rejected the send"
 
-            # If recipients configured + not skipped + email failed → status = failed
-            final_status = "failed" if (recipients and not skip_email and not email_sent) else "sent"
-            update_data = {
-                "status": final_status,
-                "file_name": filename,
-                "file_path": output_path,
-                "file_size_bytes": file_size,
-                "email_sent_at": email_sent,
-            }
-            if email_error:
-                update_data["email_error"] = email_error
-            await supabase.update("monthly_location_inputs", f"id=eq.{item['id']}", update_data)
-            logger.info("%s: %s (%d rows)", loc_name, final_status, len(processed))
+                skip_email = skip_emails is not None and item["id"] in skip_emails
+                override = (email_overrides or {}).get(item["id"]) if email_overrides else None
+                recipients = override if override is not None else ((loc_config or {}).get("email_recipients") or [])
 
-        except Exception as e:
-            await supabase.update("monthly_location_inputs", f"id=eq.{item['id']}", {
-                "status": "failed",
-                "email_error": str(e),
-            })
-            logger.exception("%s: generate failed", loc_name)
+                email_sent = None
+                email_error = None
+                if recipients and not skip_email:
+                    revenue = sum(float(r.get("_revenue", 0)) for r in processed)
+                    t = compute_totals(
+                        revenue,
+                        manual_inputs["electricity_cost"],
+                        manual_inputs["internet_cost"],
+                        manual_inputs["etax"],
+                        tx_fee_rate=tx_rate, share_rate=share_rate,
+                        share_basis=share_basis,
+                    )
+                    email_summary = {
+                        "revenue": revenue,
+                        "tx_fee_rate": tx_rate,
+                        "vat_rate": VAT_RATE,
+                        "location_share_rate": share_rate,
+                        "share_basis": share_basis,
+                        "electricity_cost": manual_inputs["electricity_cost"],
+                        "internet_cost": manual_inputs["internet_cost"],
+                        "etax": manual_inputs["etax"],
+                        **t,
+                    }
+
+                    result = await asyncio.to_thread(
+                        send_report_email,
+                        to=recipients, location_name=loc_name,
+                        year_month=year_month, file_path=output_path,
+                        file_name=filename, summary=email_summary,
+                    )
+                    if result.get("status") == "sent":
+                        email_sent = datetime.now(timezone.utc).isoformat()
+                    else:
+                        email_error = result.get("error") or "Email provider rejected the send"
+
+                final_status = "failed" if (recipients and not skip_email and not email_sent) else "sent"
+                update_data = {
+                    "status": final_status,
+                    "file_name": filename,
+                    "file_path": output_path,
+                    "file_size_bytes": file_size,
+                    "email_sent_at": email_sent,
+                }
+                if email_error:
+                    update_data["email_error"] = email_error
+                await supabase.update("monthly_location_inputs", f"id=eq.{item['id']}", update_data)
+                logger.info("%s: %s (%d rows)", loc_name, final_status, len(processed))
+
+            except Exception as e:
+                await supabase.update("monthly_location_inputs", f"id=eq.{item['id']}", {
+                    "status": "failed",
+                    "email_error": str(e),
+                })
+                logger.exception("%s: generate failed", loc_name)
+
+    await asyncio.gather(*(_process_item(i) for i in items))
 
 
 async def _run_schedule_for_snapshot(sched: dict, snapshot: dict) -> dict:

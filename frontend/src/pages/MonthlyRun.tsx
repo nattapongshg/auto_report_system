@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Database, Download, FileDown, Loader2, Send, Search, RefreshCw, Layers } from 'lucide-react';
+import { Database, Download, FileDown, Loader2, Send, Search, RefreshCw, Layers, Upload } from 'lucide-react';
 import { StatusBadge } from './Dashboard';
 import { SendReportDialog } from '../components/SendReportDialog';
 import { GroupReportDialog } from '../components/GroupReportDialog';
@@ -33,6 +33,8 @@ export function MonthlyRun() {
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [newMonth, setNewMonth] = useState(defaultMonth);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const loadSnapshots = () => {
     fetch('/api/v1/monthly/snapshots').then(r => r.json()).then(d => setSnapshots(d.items));
@@ -97,6 +99,27 @@ export function MonthlyRun() {
     });
     loadSnapshots();
     setFetching(false);
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('year_month', newMonth);
+      fd.append('question_id', '1144');
+      fd.append('file', uploadFile);
+      const r = await fetch('/api/v1/monthly/snapshots/upload', { method: 'POST', body: fd });
+      if (!r.ok) throw new Error(await r.text());
+      const d = await r.json();
+      alert(`Uploaded ${d.inserted} rows for ${d.year_month}` + (d.dropped_out_of_month ? ` (dropped ${d.dropped_out_of_month} out-of-month)` : ''));
+      setUploadFile(null);
+      loadSnapshots();
+    } catch (e) {
+      alert(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSelectSnapshot = async (s: Snapshot) => {
@@ -190,13 +213,31 @@ export function MonthlyRun() {
 
       <div className="luxury-card p-6 mb-5">
         <StepHeader num={1} title="Fetch Monthly Data" />
-        <div className="flex items-center gap-3 mt-3">
+        <div className="flex items-center gap-3 mt-3 flex-wrap">
           <input type="month" value={newMonth} onChange={(e) => setNewMonth(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg" />
           <button onClick={handleFetch} disabled={fetching} className="accent-button flex items-center gap-2">
             {fetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
-            {fetching ? 'Fetching...' : 'Fetch Data'}
+            {fetching ? 'Fetching...' : 'Fetch via Metabase'}
+          </button>
+          <span className="text-xs text-gray-400">— or —</span>
+          <input
+            type="file"
+            accept=".xlsx,.csv"
+            onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+            className="text-xs border border-gray-200 rounded-lg p-1.5 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gray-100 file:text-xs hover:file:bg-gray-200"
+          />
+          <button
+            onClick={handleUpload}
+            disabled={!uploadFile || uploading}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white hover:bg-gray-50 disabled:opacity-40"
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {uploading ? 'Uploading...' : 'Upload Export File'}
           </button>
         </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Either fetch from Metabase (needs VPN) or upload the Q1144 export (.xlsx/.csv) for the selected month.
+        </p>
         {snapshots.length > 0 && (
           <div className="mt-4 space-y-2">
             {snapshots.map(s => (

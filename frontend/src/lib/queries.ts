@@ -25,6 +25,7 @@ export interface Location {
   is_report_enabled: boolean;
   location_share_rate: number | null;
   transaction_fee_rate: number | null;
+  share_basis: 'gp' | 'revenue';
   electricity_cost: number | null;
   internet_cost: number | null;
   etax: number | null;
@@ -115,7 +116,112 @@ export const qk = {
     ['group-reports', snapshotId, 'preview', group] as const,
   privileges: (type?: string) => ['privileges', type ?? 'all'] as const,
   schedules: ['schedules'] as const,
+  reportTemplates: ['report-templates'] as const,
 };
+
+// ─── Report Templates ────────────────────────────────────────────────────
+
+export type TemplateShareBasis = 'gp' | 'revenue';
+export type TemplateLayoutStyle = 'standard' | 'dealer';
+
+export interface SummaryRow {
+  row: number;
+  kind?: 'header' | 'share' | 'net_gp' | 'dealer_header' | 'section' | 'default';
+  label?: string | null;
+  note?: string | null;
+  value?: string | null;
+  fill?: 'yellow' | 'light_blue' | 'orange' | 'green' | null;
+  bold?: boolean;
+  border?: 'all' | 'bottom' | null;
+}
+
+export interface ReportTemplate {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  share_basis: TemplateShareBasis;
+  layout_style: TemplateLayoutStyle;
+  params: Record<string, number>;
+  summary_layout: SummaryRow[];
+  is_default_for_group: string | null;
+  is_builtin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PreviewRowResult {
+  row: number;
+  kind: string;
+  label: string | null;
+  note: string | null;
+  value: number | null;
+  error: string | null;
+  fill?: string | null;
+  bold?: boolean;
+  border?: string | null;
+}
+
+export function useReportTemplates() {
+  return useQuery({
+    queryKey: qk.reportTemplates,
+    queryFn: () => api<{ items: ReportTemplate[] }>('/report-templates'),
+    select: (d) => d.items,
+  });
+}
+
+export function useSaveReportTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<ReportTemplate> }) =>
+      api<ReportTemplate>(`/report-templates/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.reportTemplates }),
+  });
+}
+
+export function useCreateReportTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<ReportTemplate>) =>
+      api<ReportTemplate>('/report-templates', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.reportTemplates }),
+  });
+}
+
+export function useDeleteReportTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api(`/report-templates/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.reportTemplates }),
+  });
+}
+
+export interface PreviewInputs {
+  revenue?: number;
+  electricity_cost?: number;
+  internet_cost?: number;
+  etax?: number;
+  location_share_rate?: number;
+  evse_count?: number;
+  location_name?: string;
+}
+
+export async function previewReportTemplate(
+  template: Partial<ReportTemplate>,
+  inputs: PreviewInputs = {},
+): Promise<{ rows: PreviewRowResult[]; context: Record<string, number | string> }> {
+  return api('/report-templates/preview', {
+    method: 'POST',
+    body: JSON.stringify({ template, ...inputs }),
+  });
+}
 
 // ─── Locations ───────────────────────────────────────────────────────────
 
@@ -299,6 +405,28 @@ export function useDeletePrivilege() {
   return useMutation({
     mutationFn: (id: string) => api(`/privileges/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['privileges'] }),
+  });
+}
+
+export interface GroupRateOverride {
+  id: string;
+  privilege_config_id: string;
+  group_name: string;
+  share_rate: number;
+  notes: string | null;
+}
+
+export function useAllGroupRates() {
+  return useQuery({
+    queryKey: ['privileges', 'group-rates', 'all'],
+    queryFn: () => api<{ items: GroupRateOverride[] }>('/privileges/group-rates/all'),
+    select: (d) => {
+      const by: Record<string, GroupRateOverride[]> = {};
+      for (const g of d.items) {
+        (by[g.privilege_config_id] ??= []).push(g);
+      }
+      return by;
+    },
   });
 }
 

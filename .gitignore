@@ -1,9 +1,13 @@
 # Secrets
 .env
 .env.local
-.env.*.local
+.env.*
+!.env.example
 config/metabase-dev.env.ps1
 config/*.env.ps1
+
+# Local docker overrides (may contain host-specific secrets)
+docker-compose.override.yml
 
 # Python
 __pycache__/
@@ -42,6 +46,7 @@ Thumbs.db
 
 # Reference files (not code)
 *.xlsx
+*.xls
 *.csv
 !backend/**/*.sql
 !report-templates/**/*.xlsx

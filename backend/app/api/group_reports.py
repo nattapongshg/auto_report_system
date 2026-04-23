@@ -19,6 +19,7 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from app.engine.excel_builder import build_report
 from app.db.raw_rows import load_snapshot_rows
 from app.engine.email_service import send_report_email
+from app.engine.share_calc import compute_totals
 
 router = APIRouter(prefix="/group-reports", tags=["group-reports"])
 
@@ -182,7 +183,7 @@ async def _generate_group_task(snap: dict, payload: GroupSendRequest, entry_id: 
         # 1. Fetch locations in group
         locs = await supabase.select(
             "locations",
-            f"select=id,name,station_code,location_share_rate,transaction_fee_rate,email_recipients,group_name"
+            f"select=id,name,station_code,location_share_rate,transaction_fee_rate,share_basis,email_recipients,group_name"
             f"&group_name=eq.{group}&is_active=eq.true"
         )
         if not locs:
@@ -211,6 +212,10 @@ async def _generate_group_task(snap: dict, payload: GroupSendRequest, entry_id: 
             rates = [float(l.get("transaction_fee_rate") or TX_FEE_RATE) for l in locs]
             tx_fee_rate = Counter(rates).most_common(1)[0][0]
 
+        # Group share_basis = mode across member locations
+        bases = [(l.get("share_basis") or 'gp') for l in locs]
+        share_basis = Counter(bases).most_common(1)[0][0]
+
         # 4. Pick bill image (first uploaded one; embed inline)
         bill_path = None
         if payload.bill_image_urls:
@@ -234,6 +239,7 @@ async def _generate_group_task(snap: dict, payload: GroupSendRequest, entry_id: 
             "etax": float(total_etax),
             "transaction_fee_rate": tx_fee_rate,
             "location_share_rate": share_rate,
+            "share_basis": share_basis,
             "vat_rate": VAT_RATE,
         }
         excel_bytes = build_report(
@@ -263,13 +269,12 @@ async def _generate_group_task(snap: dict, payload: GroupSendRequest, entry_id: 
         # 6. Compute preview numbers for DB
         revenue = sum(float(r.get("_revenue") or 0) for r in group_rows)
         kwh = sum(float(r.get("kwh") or 0) for r in group_rows)
-        tx_fee = revenue * tx_fee_rate
-        vat_on_fee = tx_fee * VAT_RATE
-        total_fee = tx_fee + vat_on_fee
-        internet_incl_vat = total_internet * (1 + VAT_RATE)
-        etax_incl_vat = total_etax * (1 + VAT_RATE)
-        remaining = revenue - total_fee - total_elec - internet_incl_vat - etax_incl_vat
-        share = remaining * share_rate
+        t = compute_totals(
+            revenue, float(total_elec), float(total_internet), float(total_etax),
+            tx_fee_rate=tx_fee_rate, share_rate=share_rate, share_basis=share_basis,
+        )
+        remaining = t["remaining"]
+        share = t["location_share"]
 
         # 7. Resolve recipients
         skip_email = payload.skip_email
@@ -293,19 +298,12 @@ async def _generate_group_task(snap: dict, payload: GroupSendRequest, entry_id: 
                 "tx_fee_rate": tx_fee_rate,
                 "vat_rate": VAT_RATE,
                 "location_share_rate": share_rate,
-                "tx_fee": tx_fee,
-                "vat_on_fee": vat_on_fee,
-                "total_fee": total_fee,
+                "share_basis": share_basis,
                 "electricity_cost": total_elec,
                 "internet_cost": total_internet,
-                "internet_incl_vat": internet_incl_vat,
                 "etax": total_etax,
-                "etax_incl_vat": etax_incl_vat,
-                "remaining": remaining,
-                "location_share": share,
-                "vat_portion": share - (share / (1 + VAT_RATE)),
-                "before_vat": share / (1 + VAT_RATE),
                 "location_name": f"{group} (Group)",
+                **t,
             }
             result = send_report_email(
                 to=recipients,

@@ -9,7 +9,7 @@ router = APIRouter(prefix="/locations", tags=["locations"])
 # Fields exposed to the monthly-report config UI
 _CONFIG_FIELDS = (
     "id,name,station_code,is_active,is_report_enabled,"
-    "location_share_rate,transaction_fee_rate,"
+    "location_share_rate,transaction_fee_rate,share_basis,"
     "electricity_cost,internet_cost,etax,"
     "email_recipients,group_name"
 )
@@ -19,6 +19,7 @@ class LocationUpdate(BaseModel):
     is_report_enabled: bool | None = None
     location_share_rate: float | None = None
     transaction_fee_rate: float | None = None
+    share_basis: str | None = None
     electricity_cost: float | None = None
     internet_cost: float | None = None
     etax: float | None = None

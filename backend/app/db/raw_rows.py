@@ -2,7 +2,9 @@
 
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 from app.db.pool import get_pool
 
@@ -96,10 +98,13 @@ async def load_snapshot_rows(
     snapshot_id: str,
     *,
     location_name: str | None = None,
+    location_names: list[str] | None = None,
 ) -> tuple[list[list[Any]], list[str]]:
     """Return `(rows, col_names)` shaped like the old JSON format.
 
-    This keeps `process_rows(raw_rows, col_names, ...)` working unchanged.
+    Pass `location_names` to narrow to a subset — much faster than loading the
+    full 175k-row snapshot only to filter in Python when you're generating
+    a single location's report.
     """
     query = f"""
         SELECT {", ".join(COLUMNS)}
@@ -110,12 +115,24 @@ async def load_snapshot_rows(
     if location_name is not None:
         query += " AND location_name = $2"
         args.append(location_name)
+    elif location_names:
+        query += " AND location_name = ANY($2::text[])"
+        args.append(list(location_names))
 
     pool = await get_pool()
     async with pool.acquire() as conn:
         records = await conn.fetch(query, *args)
 
-    rows = [[r[c] for c in COLUMNS] for r in records]
+    def _json_safe(v: Any) -> Any:
+        # openpyxl can't serialize UUID/Decimal; process_rows / excel_builder
+        # expect plain strings / floats like the old JSON snapshot format.
+        if isinstance(v, UUID):
+            return str(v)
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+    rows = [[_json_safe(r[c]) for c in COLUMNS] for r in records]
     return rows, COLUMNS
 
 

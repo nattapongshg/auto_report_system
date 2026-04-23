@@ -1,12 +1,14 @@
-import { Gift, Calendar, MapPin, Clock, Users } from 'lucide-react';
+import { Gift, Calendar, MapPin, Users, Bolt, FileSpreadsheet, LayoutTemplate } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const NAV = [
-  { path: '/monthly', label: 'Monthly Reports', icon: Calendar, end: false },
-  { path: '/schedules', label: 'Schedules', icon: Clock, end: false },
+  { path: '/reports', label: 'Report Generation', icon: FileSpreadsheet, end: false },
+  { path: '/monthly', label: 'Fetch Raw Data', icon: Calendar, end: false },
   { path: '/locations', label: 'Locations', icon: MapPin, end: false },
   { path: '/groups', label: 'Groups', icon: Users, end: false },
+  { path: '/electricity', label: 'Electricity', icon: Bolt, end: false },
   { path: '/privileges', label: 'Privileges', icon: Gift, end: false },
+  { path: '/templates', label: 'Report Templates', icon: LayoutTemplate, end: false },
 ];
 
 export function Sidebar() {

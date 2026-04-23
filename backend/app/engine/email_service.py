@@ -37,6 +37,7 @@ def _render_summary_table(s: dict) -> str:
     tx_fee_rate = s.get("tx_fee_rate", 0.0365)
     vat_rate = s.get("vat_rate", 0.07)
     share_rate = s.get("location_share_rate", 0.40)
+    share_basis = s.get("share_basis", "gp")
 
     def row(label, note, value, *, bold=False, highlight=False, accent=False, top=False):
         label_color = "#121212" if bold else "#121212"
@@ -68,16 +69,18 @@ def _render_summary_table(s: dict) -> str:
         </thead>
         <tbody>
             {row("Revenue", "", rev, bold=True)}
-            {row("Transaction Fee", f"({tx_fee_rate*100:.2f}% of Revenue)", s.get("tx_fee"))}
-            {row("VAT", f"({vat_rate*100:.0f}% of Transaction Fee)", s.get("vat_on_fee"))}
-            {row("Total Fee", "", s.get("total_fee"), bold=True)}
-            {row("Electricity Cost", "", s.get("electricity_cost"), bold=True, highlight=True)}
-            {row("Internet Cost", "", s.get("internet_cost"))}
-            {row("Internet (Incl. VAT 7%)", "", s.get("internet_incl_vat"))}
-            {row("Etax", "", s.get("etax"))}
-            {row("Etax (Incl. VAT 7%)", "", s.get("etax_incl_vat"))}
-            {row("คงเหลือ / Remaining", "", s.get("remaining"), bold=True, top=True)}
-            {row(loc, f"({int(share_rate*100)}% of Total Revenue VAT Incl.)", s.get("location_share"), bold=True, accent=True, top=True)}
+            {"" if share_basis == "revenue" else (
+                row("Transaction Fee", f"({tx_fee_rate*100:.2f}% of Revenue)", s.get("tx_fee"))
+                + row("VAT", f"({vat_rate*100:.0f}% of Transaction Fee)", s.get("vat_on_fee"))
+                + row("Total Fee", "", s.get("total_fee"), bold=True)
+                + row("Electricity Cost", "", s.get("electricity_cost"), bold=True, highlight=True)
+                + row("Internet Cost", "", s.get("internet_cost"))
+                + row("Internet (Incl. VAT 7%)", "", s.get("internet_incl_vat"))
+                + row("Etax", "", s.get("etax"))
+                + row("Etax (Incl. VAT 7%)", "", s.get("etax_incl_vat"))
+                + row("คงเหลือ / Remaining", "", s.get("remaining"), bold=True, top=True)
+            )}
+            {row(loc, (f"({int(share_rate*100)}% of Revenue)" if share_basis == "revenue" else f"({int(share_rate*100)}% of Gross Profit VAT Incl.)"), s.get("location_share"), bold=True, accent=True, top=True)}
             {row("VAT", "(7% of Cash In)", s.get("vat_portion"), accent=True)}
             {row("Before VAT", "", s.get("before_vat"), accent=True)}
         </tbody>

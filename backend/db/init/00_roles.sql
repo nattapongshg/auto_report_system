@@ -1,3 +1,6 @@
+-- Required extensions (uuid_generate_v4 etc).
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Roles expected by PostgREST (mirrors Supabase convention).
 -- anon = unauthenticated, authenticated = logged-in user, service_role = backend.
 -- All RLS policies in the app use `service_role` so the backend has full access.

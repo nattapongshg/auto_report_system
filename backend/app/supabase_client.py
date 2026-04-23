@@ -26,7 +26,7 @@ class SupabaseClient:
             prefer += ", count=exact"
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.get(
-                f"{self.url}/rest/v1/{table}?{params}",
+                f"{self.url}/{table}?{params}",
                 headers=self._h({"Accept": "application/json"} if not single else {"Accept": "application/vnd.pgrst.object+json"}),
             )
             if r.status_code == 406:  # no rows for single
@@ -37,7 +37,7 @@ class SupabaseClient:
     async def count(self, table: str, params: str = "") -> int:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.head(
-                f"{self.url}/rest/v1/{table}?{params}",
+                f"{self.url}/{table}?{params}",
                 headers=self._h({"Prefer": "count=exact"}),
             )
             r.raise_for_status()
@@ -46,7 +46,7 @@ class SupabaseClient:
     async def insert(self, table: str, data: dict) -> dict:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.post(
-                f"{self.url}/rest/v1/{table}",
+                f"{self.url}/{table}",
                 headers=self._h({"Prefer": "return=representation"}),
                 json=data,
             )
@@ -59,7 +59,7 @@ class SupabaseClient:
             return []
         async with httpx.AsyncClient(timeout=60) as c:
             r = await c.post(
-                f"{self.url}/rest/v1/{table}",
+                f"{self.url}/{table}",
                 headers=self._h({"Prefer": "return=representation"}),
                 json=rows,
             )
@@ -69,7 +69,7 @@ class SupabaseClient:
     async def update(self, table: str, match_params: str, data: dict) -> dict:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.patch(
-                f"{self.url}/rest/v1/{table}?{match_params}",
+                f"{self.url}/{table}?{match_params}",
                 headers=self._h({"Prefer": "return=representation"}),
                 json=data,
             )
@@ -80,7 +80,7 @@ class SupabaseClient:
     async def delete(self, table: str, match_params: str) -> None:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.delete(
-                f"{self.url}/rest/v1/{table}?{match_params}",
+                f"{self.url}/{table}?{match_params}",
                 headers=self._h(),
             )
             r.raise_for_status()

@@ -24,8 +24,12 @@ invoice_data AS MATERIALIZED (
   SELECT
     i.id AS invoice_id,
     i.status,
+    i.organization_id,
     i.invoice_number,
-    i.settled_at,
+    -- Fleet invoices (billed_to_organization) have settled_at = NULL; fall
+    -- back to created_at so they still pass the period filter and show up
+    -- with a sensible paid-date in the report.
+    COALESCE(i.settled_at, i.created_at) AS settled_at,
     i.total_satang,
     i.total_discount_satang,
     i.total_refund_satang,
@@ -37,9 +41,8 @@ invoice_data AS MATERIALIZED (
     FROM jsonb_array_elements(COALESCE(i.discounts, '[]'::jsonb))
       WITH ORDINALITY AS e(elem, ord)
   ) dl ON TRUE
-  WHERE i.status IN ('settled', 'refunded')
-    AND i.organization_id IS NULL
-    AND i.settled_at BETWEEN p.start_utc AND p.end_utc
+  WHERE i.status IN ('settled', 'refunded', 'billed_to_organization')
+    AND COALESCE(i.settled_at, i.created_at) BETWEEN p.start_utc AND p.end_utc
 ),
 payments_agg AS MATERIALIZED (
   SELECT
