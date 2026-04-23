@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bolt, Upload, Loader2, X, Search, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PageTitle } from '../components/ui/primitives';
 
 type Provider = 'pea' | 'mea';
 
@@ -90,16 +91,12 @@ export function Electricity() {
   const fmt = (n: number | null) => n == null ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Bolt className="w-6 h-6 text-yellow-500" /> Electricity Bills
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Uploaded PEA / MEA bills. Auto-fills electricity_cost in monthly reports via CA matching.
-          </p>
-        </div>
+    <div className="px-10 py-8 max-w-[1500px] mx-auto">
+      <PageTitle
+        title={<span className="inline-flex items-center gap-2"><Bolt size={22} strokeWidth={1.75} style={{ color: '#F59E0B' }} /> Electricity Bills</span>}
+        subtitle="Uploaded PEA / MEA bills. Auto-fills electricity_cost in monthly reports via CA matching."
+      />
+      <div className="flex items-center justify-end mb-6">
         <div className="flex gap-2">
           <button
             onClick={() => setUploadFor('pea')}

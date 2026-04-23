@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw, Save, Search, Plus, Trash2, X, Loader2, Layers } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Btn, PageTitle } from '../components/ui/primitives';
 import type { PrivilegeConfig } from '../lib/queries';
 import {
   qk,
-  useAllGroupRates, useCreatePrivilege, useDeletePrivilege, usePrivileges, useSavePrivilege,
+  useAllGroupRates, useDeletePrivilege, usePrivileges, useSavePrivilege,
 } from '../lib/queries';
 
 const TYPE_OPTIONS = ['credit', 'percent'];
@@ -76,26 +77,22 @@ export function Privileges() {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Privilege Configs</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {stats.total} privileges · {stats.credit} credit, {stats.percent} percent · {stats.withProgName} with program_name · {stats.withRate} with share_rate
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCreating(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-[#8B1927] text-white rounded-lg text-sm hover:bg-[#701421]"
-          >
-            <Plus className="w-4 h-4" /> New
-          </button>
-          <button onClick={refresh} className="p-2 hover:bg-gray-100 rounded-lg cursor-pointer" title="Refresh">
-            <RefreshCw className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
+    <div className="px-10 py-8 max-w-[1500px] mx-auto">
+      <PageTitle
+        title="Privilege Configs"
+        subtitle={`${stats.total} privileges · ${stats.credit} credit, ${stats.percent} percent · ${stats.withProgName} with program_name · ${stats.withRate} with share_rate`}
+        right={
+          <>
+            <Btn kind="ghost" onClick={refresh} title="Refresh">
+              <RefreshCw size={13} />
+              Refresh
+            </Btn>
+            <Btn kind="primaryG" onClick={() => setCreating(true)}>
+              <Plus size={13} /> New
+            </Btn>
+          </>
+        }
+      />
 
       <div className="flex items-center gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">

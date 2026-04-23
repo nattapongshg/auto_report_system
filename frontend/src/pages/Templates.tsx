@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown, ChevronRight, Copy, Eye, Loader2, Plus, RefreshCw, Save, Trash2, X,
 } from 'lucide-react';
+import { Btn, PageTitle } from '../components/ui/primitives';
 import {
   previewReportTemplate,
   useCreateReportTemplate,
@@ -105,34 +106,29 @@ export function Templates() {
   };
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
-      <header className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Report Templates</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Configure what appears in the Summary sheet and which fields pull live.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => refetch()}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-          <button
-            onClick={() => {
-              setCreating((v) => !v);
-              setExpandedId(null);
-            }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg"
-          >
-            <Plus className="w-4 h-4" />
-            New Template
-          </button>
-        </div>
-      </header>
+    <div className="px-10 py-8 max-w-[1500px] mx-auto">
+      <PageTitle
+        title="Report Templates"
+        subtitle="Configure what appears in the Excel Summary sheet and which fields pull live at generate time."
+        right={
+          <>
+            <Btn kind="ghost" onClick={() => refetch()}>
+              <RefreshCw size={13} />
+              Refresh
+            </Btn>
+            <Btn
+              kind="primaryG"
+              onClick={() => {
+                setCreating((v) => !v);
+                setExpandedId(null);
+              }}
+            >
+              <Plus size={13} />
+              New Template
+            </Btn>
+          </>
+        }
+      />
 
       {creating && (
         <CreateForm
@@ -145,7 +141,7 @@ export function Templates() {
       )}
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12 text-gray-500">
+        <div className="flex items-center justify-center py-12 text-[color:var(--fg-muted)]">
           <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading…
         </div>
       ) : (
@@ -155,7 +151,8 @@ export function Templates() {
             return (
               <div
                 key={t.id}
-                className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+                className="bg-white border border-[color:var(--border-default)] rounded-[14px] overflow-hidden transition-shadow"
+                style={{ boxShadow: 'var(--shadow-card)' }}
               >
                 <button
                   onClick={() => toggleExpand(t.id)}
@@ -201,7 +198,7 @@ export function Templates() {
                       e.stopPropagation();
                       handleDuplicate(t);
                     }}
-                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-[color:var(--sharge-red-deep)] hover:bg-[color:var(--sharge-red-tint)] rounded"
                     title="Duplicate"
                   >
                     <Copy className="w-4 h-4" />
@@ -357,7 +354,7 @@ function Editor({
                     onClick={() => set('share_basis', opt.value)}
                     className={`flex-1 text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
                       draft.share_basis === opt.value
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-900'
+                        ? 'bg-[color:var(--sharge-red-tint)] border-[color:var(--sharge-red-deep)] text-[color:var(--sharge-red-dark)]'
                         : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -376,7 +373,7 @@ function Editor({
                     onClick={() => set('layout_style', opt.value)}
                     className={`flex-1 text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
                       draft.layout_style === opt.value
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-900'
+                        ? 'bg-[color:var(--sharge-red-tint)] border-[color:var(--sharge-red-deep)] text-[color:var(--sharge-red-dark)]'
                         : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -394,7 +391,7 @@ function Editor({
               <span className="text-xs font-medium text-gray-600">Params (constants available to formulas)</span>
               <button
                 onClick={addParam}
-                className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                className="text-xs text-[color:var(--sharge-red-deep)] hover:text-[color:var(--sharge-red-dark)] flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" /> add
               </button>
@@ -430,7 +427,7 @@ function Editor({
               <span className="text-xs font-medium text-gray-600">Summary layout ({draft.summary_layout.length} rows)</span>
               <button
                 onClick={addRow}
-                className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                className="text-xs text-[color:var(--sharge-red-deep)] hover:text-[color:var(--sharge-red-dark)] flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" /> add row
               </button>
@@ -518,7 +515,8 @@ function Editor({
             <button
               onClick={onSave}
               disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 hover:brightness-110"
+              style={{ background: 'var(--sharge-red-deep)' }}
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Save
@@ -814,7 +812,7 @@ function CreateForm({
   };
 
   return (
-    <div className="mb-3 bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+    <div className="mb-3 rounded-[14px] p-4" style={{ background: 'var(--sharge-red-tint)', border: '1px solid var(--sharge-red-deep)' }}>
       <div className="grid grid-cols-[1fr_2fr_1fr_1fr_auto_auto] gap-2 items-end">
         <label className="block">
           <span className="text-xs text-gray-600">Code</span>
@@ -859,7 +857,8 @@ function CreateForm({
         <button
           onClick={submit}
           disabled={create.isPending}
-          className="px-4 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg disabled:opacity-50"
+          className="px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 hover:brightness-110"
+          style={{ background: 'var(--sharge-red-deep)' }}
         >
           Create
         </button>

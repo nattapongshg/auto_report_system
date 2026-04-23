@@ -3,6 +3,7 @@ import { Database, Download, FileDown, Loader2, Send, Search, RefreshCw, Layers,
 import { StatusBadge } from './Dashboard';
 import { SendReportDialog } from '../components/SendReportDialog';
 import { GroupReportDialog } from '../components/GroupReportDialog';
+import { PageTitle } from '../components/ui/primitives';
 
 interface Snapshot { id: string; year_month: string; total_rows: number; status: string; fetched_at: string | null; }
 interface Entry {
@@ -207,9 +208,11 @@ export function MonthlyRun() {
   const generatingCount = entries.filter(e => e.status === 'generating').length;
 
   return (
-    <div className="p-8 max-w-[1600px]">
-      <h1 className="text-2xl font-bold tracking-tight mb-1">Monthly Reports</h1>
-      <p className="text-sm text-[#636E72] mb-6">Fetch month data → pick location → enter electricity → send</p>
+    <div className="px-10 py-8 max-w-[1600px] mx-auto">
+      <PageTitle
+        title="Fetch Raw Data"
+        subtitle="Pull a monthly snapshot from Metabase (Q1144 / Q1145) or upload a CSV/XLSX if you're off-VPN."
+      />
 
       <div className="luxury-card p-6 mb-5">
         <StepHeader num={1} title="Fetch Monthly Data" />

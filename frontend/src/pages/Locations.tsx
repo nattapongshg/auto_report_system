@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Save, Search, Wand2 } from 'lucide-react';
+import { Btn, Card, PageTitle } from '../components/ui/primitives';
 
 interface Location {
   id: string;
@@ -154,28 +155,28 @@ export function Locations() {
   };
 
   return (
-    <div className="p-8 max-w-[1600px]">
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
-        <button
-          onClick={saveAll}
-          disabled={dirtyLocs.length === 0 || savingAll}
-          className="flex items-center gap-2 px-4 py-2 bg-[#8B1927] text-white rounded-lg text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#701421]"
-        >
-          {savingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save All ({dirtyLocs.length})
-        </button>
-      </div>
-      <p className="text-sm text-[#636E72] mb-6">
-        Per-location config — share rate, fees, costs, and group.
-      </p>
+    <div className="px-10 py-8 max-w-[1600px] mx-auto">
+      <PageTitle
+        title="Locations"
+        subtitle="Per-location config — share rate, fees, costs, and group. Synced from Q1146 Location Master."
+        right={
+          <Btn
+            kind="primary"
+            onClick={saveAll}
+            disabled={dirtyLocs.length === 0 || savingAll}
+          >
+            {savingAll ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            Save All ({dirtyLocs.length})
+          </Btn>
+        }
+      />
 
-      <div className="luxury-card p-5 mb-5">
-        <p className="text-sm">
-          <span className="font-semibold">{items.length}</span> locations ·{' '}
-          <span className="font-medium text-emerald-700">{items.filter(i => i.requires_booking).length}</span> booking ·{' '}
-          <span className="font-medium text-amber-700">{items.filter(i => i.enable_overtime).length}</span> overtime ·{' '}
-          <span className="font-medium text-gray-500">{items.filter(i => i.ocpi_location_id).length}</span> metabase-synced
+      <Card className="mb-5">
+        <p className="text-[13px] text-[color:var(--fg-default)]">
+          <b className="text-[color:var(--fg-strong)]">{items.length}</b> locations ·{' '}
+          <b className="text-emerald-700">{items.filter(i => i.requires_booking).length}</b> booking ·{' '}
+          <b className="text-amber-700">{items.filter(i => i.enable_overtime).length}</b> overtime ·{' '}
+          <b className="text-[color:var(--fg-muted)]">{items.filter(i => i.ocpi_location_id).length}</b> metabase-synced
           {dirtyLocs.length > 0 && (
             <span className="ml-2 text-amber-600">· {dirtyLocs.length} unsaved</span>
           )}
@@ -213,7 +214,7 @@ export function Locations() {
             Metabase-synced only
           </label>
         </div>
-      </div>
+      </Card>
 
       <div className="luxury-card p-4 mb-5 bg-blue-50/30 border-blue-100">
         <div className="flex items-center gap-2 mb-3">
